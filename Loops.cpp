@@ -2,6 +2,7 @@
 #include <string>
 #include <time.h>
 #include <algorithm>
+#include <locale>
 
 constexpr int g_weaponNone = 0;
 constexpr int g_weaponSword = 1;
@@ -37,6 +38,27 @@ std::string GetWeaponName(int weapon)
 	}
 }
 
+int GetWeaponDamage(int weapon)
+{
+	switch (weapon)
+	{
+	case g_weaponNone:
+		return 1 + rand() % 2;
+		break;
+
+	case g_weaponSword:
+		return 4 + rand() % 3;
+		break;
+
+	case g_weaponAxe:
+		return 2 + rand() % 7;
+		break;
+
+	default:
+		return 0;
+	}
+}
+
 std::string GetArmorName(int armor)
 {
 	switch (armor)
@@ -62,6 +84,56 @@ std::string GetArmorName(int armor)
 	}
 }
 
+int GetArmorBonusHealth(int armor)
+{
+	switch (armor)
+	{
+	case g_armorNone:
+		return 0;
+		break;
+
+	case g_armorLight:
+		return 10;
+		break;
+
+	case g_armorMedium:
+		return 20;
+		break;
+
+	case g_armorHeavy:
+		return 50;
+		break;
+
+	default:
+		return 0;
+	}
+}
+
+int GetArmorDodgeRate(int armor)
+{
+	switch (armor)
+	{
+	case g_armorNone:
+		return 0;
+		break;
+
+	case g_armorLight:
+		return 20;
+		break;
+
+	case g_armorMedium:
+		return 10;
+		break;
+
+	case g_armorHeavy:
+		return 0;
+		break;
+
+	default:
+		return 0;
+	}
+}
+
 void PressAnyKeyToContinue()
 {
 	std::cout << "Press any key to continue" << std::endl;
@@ -71,36 +143,46 @@ void PressAnyKeyToContinue()
 
 //Game logic
 
-void Rest(int& playerHealth)
+void Rest(int& playerHealth, int playerMaxHealth)
 {
-	std::cout << "Would you like to rest before the next encounter? (y/n)" << std::endl;
-	char choice = 'n';
-	std::cin >> choice;
-
 	constexpr int restHealing = 20;
 
-	if (choice == 'y')
-	{
-		playerHealth = std::clamp(playerHealth + restHealing, 0, 100);
-		std::cout << "You healed " << restHealing << "!" << std::endl;
-		std::cout << "You now have " << playerHealth << " Health" << std::endl;
-	}
+	playerHealth = std::clamp(playerHealth + restHealing, 0, playerMaxHealth);
+	std::cout << "You healed " << restHealing << "!" << std::endl;
+	std::cout << "You now have " << playerHealth << " Health" << std::endl;
+
+	PressAnyKeyToContinue();
 }
 
-void Round(int roundNumber, int& playerHealth, int& enemyHealth)
+void Round(int roundNumber, int& playerHealth, int playerWeapon, int playerArmor, int& enemyHealth, int enemyWeapon, int enemyArmor)
 {
 	system("cls");
 
 	std::cout << "Round " << roundNumber << std::endl;
 
-	int playerAttack = 5 + rand() % 6;
-	int enemyAttack = 4 + rand() % 4;
+	int playerDodge = GetArmorDodgeRate(playerArmor);
+	int enemyDodge = GetArmorDodgeRate(enemyArmor);
+
+	int playerAttack = GetWeaponDamage(playerWeapon);
+	int enemyAttack = GetWeaponDamage(enemyWeapon);
+
+	if (playerDodge > rand() % 101)
+	{
+		std::cout << "You dodged the enemy's attack!" << std::endl;
+		enemyAttack = 0;
+	}
+
+	if (enemyDodge > rand() % 101)
+	{
+		std::cout << "The enemy dodged your attack!" << std::endl;
+		playerAttack = 0;
+	}
 
 	std::cout << "You Dealt: " << playerAttack << " Damage!" << std::endl;
 	std::cout << "You took: " << enemyAttack << " Damage!" << std::endl;
 
-	enemyHealth = std::clamp(enemyHealth - playerAttack, 0, 100);
-	playerHealth = std::clamp(playerHealth - enemyAttack, 0, 100);
+	enemyHealth = std::clamp(enemyHealth - playerAttack, 0, enemyHealth);
+	playerHealth = std::clamp(playerHealth - enemyAttack, 0, playerHealth);
 
 	std::cout << "Your Health is: " << playerHealth << std::endl;
 	std::cout << "The Enemy Health is: " << enemyHealth << std::endl;
@@ -108,7 +190,7 @@ void Round(int roundNumber, int& playerHealth, int& enemyHealth)
 	PressAnyKeyToContinue();
 }
 
-void Encounter(int& playerHealth)
+void Encounter(int& playerHealth, int playerMaxHealth, int playerWeapon, int playerArmor)
 {
 	system("cls");
 
@@ -120,6 +202,8 @@ void Encounter(int& playerHealth)
 	int enemyArmor = rand() % g_armorMax;
 	std::string enemyArmorName = GetArmorName(enemyArmor);
 
+	enemyHealth += GetArmorBonusHealth(enemyArmor);
+
 	std::cout << "You Encountered an Enemy" << std::endl;
 	std::cout << "Their Health is: " << enemyHealth << std::endl;
 	std::cout << "Their weapon is: " << enemyWeaponName << std::endl;
@@ -127,26 +211,9 @@ void Encounter(int& playerHealth)
 
 	PressAnyKeyToContinue();
 
-	Round(1, playerHealth, enemyHealth);
-
-	if (playerHealth > 0 && enemyHealth > 0)
+	for (int i = 1; playerHealth > 0 && enemyHealth > 0; i++)
 	{
-		Round(2, playerHealth, enemyHealth);
-	}
-
-	if (playerHealth > 0 && enemyHealth > 0)
-	{
-		Round(3, playerHealth, enemyHealth);
-	}
-
-	if (playerHealth > 0 && enemyHealth > 0)
-	{
-		Round(4, playerHealth, enemyHealth);
-	}
-
-	if (playerHealth > 0 && enemyHealth > 0)
-	{
-		Round(5, playerHealth, enemyHealth);
+		Round(i, playerHealth, playerWeapon, playerArmor, enemyHealth, enemyWeapon, enemyArmor);
 	}
 
 	system("cls");
@@ -170,6 +237,24 @@ void Encounter(int& playerHealth)
 	PressAnyKeyToContinue();
 }
 
+void PostEncounterOptions(bool& quit, int& playerHealth, int playerMaxHealth)
+{
+	std::cout << "What would you like to do now?" << std::endl;
+	std::cout << "- Rest" << std::endl;
+	std::cout << "- Quit" << std::endl;
+	std::string choice;
+	std::cin >> choice;
+
+	if (choice == "Rest" || choice == "rest")
+	{
+		Rest(playerHealth, playerMaxHealth);
+	}
+	else if (choice == "Quit" || choice == "quit")
+	{
+		quit = true;
+	}
+}
+
 void PlayGame()
 {
 	srand(time(NULL));
@@ -182,7 +267,7 @@ void PlayGame()
 
 	system("cls");
 
-	int playerHealth = 100;
+	int playerMaxHealth = 100;
 
 	std::cout << "Choose your weapon" << std::endl;
 	std::cout << g_weaponSword << ") Sword" << std::endl;
@@ -205,6 +290,10 @@ void PlayGame()
 
 	system("cls");
 
+	playerMaxHealth += GetArmorBonusHealth(armor);
+
+	int playerHealth = playerMaxHealth;
+
 	std::cout << "Hello " << name << std::endl;
 	std::cout << "Your Health is: " << playerHealth << std::endl;
 	std::cout << "Your weapon of choice is: " << weaponName << std::endl;
@@ -212,32 +301,22 @@ void PlayGame()
 
 	PressAnyKeyToContinue();
 
-	Encounter(playerHealth);
+	bool quit = false;
 
-	if (playerHealth > 0)
+	do 
 	{
-		Rest(playerHealth);
-	}
-
-	if (playerHealth > 0)
-	{
-		Encounter(playerHealth);
+		Encounter(playerHealth, playerMaxHealth, weapon, armor);
 
 		if (playerHealth > 0)
 		{
-			Rest(playerHealth);
+			PostEncounterOptions(quit, playerHealth, playerMaxHealth);
 		}
-	}
-
-	if (playerHealth > 0)
-	{
-		Encounter(playerHealth);
-
-		if (playerHealth > 0)
+		else
 		{
-			Rest(playerHealth);
+			quit = true;
 		}
-	}
+
+	} while (playerHealth > 0 && !quit);
 }
 
 int main()
